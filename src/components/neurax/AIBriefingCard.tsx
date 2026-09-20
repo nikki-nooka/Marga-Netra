@@ -321,7 +321,7 @@ export const AIBriefingCard: React.FC<AIBriefingCardProps> = ({
   return (
     <div
       id="ai-briefing-card"
-      className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between relative overflow-hidden"
+      className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col h-[560px] max-h-[560px] relative overflow-hidden"
     >
       <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50/50 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16" />
 
@@ -685,7 +685,7 @@ export const AIBriefingCard: React.FC<AIBriefingCardProps> = ({
       )}
 
       {/* Main Content Card */}
-      <div className="my-3.5 flex-1">
+      <div className="my-2.5 flex-1 min-h-0 overflow-y-auto pr-1.5 custom-scrollbar">
         {loading ? (
           <div className="py-6 flex items-center justify-center text-slate-400 gap-2 text-sm">
             <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
@@ -865,7 +865,7 @@ export const AIBriefingCard: React.FC<AIBriefingCardProps> = ({
       </div>
 
       {/* Footer metadata */}
-      <div className="pt-2 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2 text-[11px] text-slate-400">
+      <div className="pt-3 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2 text-[11px] text-slate-400 shrink-0 mt-auto">
         <span className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
           Engine: {briefing?.provider || 'NeuraX Kinematic Graph Model'}

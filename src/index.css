@@ -12,7 +12,12 @@
   scrollbar-width: none !important; /* Firefox */
 }
 
-/* Subtle modern scrollbar for drawers */
+/* Subtle modern scrollbar for drawers and cards */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;
