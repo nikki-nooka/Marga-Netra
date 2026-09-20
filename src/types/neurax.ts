@@ -316,6 +316,28 @@ export interface WeeklyMacroDay {
   avg_speed: number;
   total_trips_k: number;
   weather_sensitivity: number;
+  los?: string;
+  peak_flow_vph?: number;
+  vc_ratio?: number;
+  buffer_index_pct?: number;
+  delay_minutes?: number;
+  is_weekend?: boolean;
+}
+
+export interface HourlyTrafficPoint {
+  hour: string;
+  congestion: number;
+  avg_speed: number;
+  flow_vph: number;
+  capacity_vph: number;
+  vc_ratio: number;
+  delay_min: number;
+  los: string;
+  fuel_waste_liters: number;
+  passenger_cars_vph: number;
+  freight_trucks_vph: number;
+  two_wheelers_vph: number;
+  is_peak?: boolean;
 }
 
 export interface WeeklyMacroProfile {
@@ -323,6 +345,10 @@ export interface WeeklyMacroProfile {
   weekly_avg_speed: number;
   total_vkt_millions: number;
   lost_hours_k: number;
+  fuel_wasted_k_liters?: number;
+  carbon_tons?: number;
+  busiest_day?: string;
+  network_buffer_index?: number;
 }
 
 export interface PretrainedBenchmarkData {

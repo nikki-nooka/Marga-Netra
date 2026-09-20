@@ -520,7 +520,11 @@ export const NeuraXDashboard: React.FC<NeuraXDashboardProps> = ({
           {/* 10. Weekly Patterns View */}
           {activeTab === 'weekly' && (
             <div className="animate-fadeIn">
-              <WeeklyView />
+              <WeeklyView
+                selectedSegmentId={contextSegmentId}
+                onSelectSegment={setContextSegmentId}
+                currentRegime={activeRegime}
+              />
             </div>
           )}
         </main>

@@ -17,6 +17,7 @@ import type {
   BriefingResult,
   WeeklyMacroProfile,
   WeeklyMacroDay,
+  HourlyTrafficPoint,
   CongestionLevel,
   AIRiskLevel,
   TrafficRegime,
@@ -971,23 +972,311 @@ class NeuraXEngine {
     return this.segments.filter((s) => s.ai_risk_level === 'CRITICAL' || s.is_anomaly);
   }
 
-  public getWeeklyMacroProfile(): WeeklyMacroProfile {
-    const days: WeeklyMacroDay[] = [
-      { day_name: 'Monday', peak_hours: '08:00 - 10:30', avg_congestion: 48, avg_speed: 38.2, total_trips_k: 420, weather_sensitivity: 1.25 },
-      { day_name: 'Tuesday', peak_hours: '08:30 - 10:15', avg_congestion: 44, avg_speed: 40.5, total_trips_k: 435, weather_sensitivity: 1.20 },
-      { day_name: 'Wednesday', peak_hours: '08:30 - 10:30', avg_congestion: 49, avg_speed: 37.9, total_trips_k: 442, weather_sensitivity: 1.28 },
-      { day_name: 'Thursday', peak_hours: '08:30 - 11:00', avg_congestion: 52, avg_speed: 36.4, total_trips_k: 458, weather_sensitivity: 1.32 },
-      { day_name: 'Friday', peak_hours: '17:00 - 21:00', avg_congestion: 64, avg_speed: 31.8, total_trips_k: 492, weather_sensitivity: 1.45 },
-      { day_name: 'Saturday', peak_hours: '13:00 - 19:30', avg_congestion: 34, avg_speed: 44.1, total_trips_k: 385, weather_sensitivity: 1.15 },
-      { day_name: 'Sunday', peak_hours: '18:00 - 21:30', avg_congestion: 22, avg_speed: 48.7, total_trips_k: 310, weather_sensitivity: 1.08 },
+  public getWeeklyMacroProfile(options?: {
+    segmentId?: string;
+    regime?: TrafficRegime;
+    weather?: 'dry' | 'light_rain' | 'heavy_rain';
+    situation?: string;
+  }): WeeklyMacroProfile {
+    const targetSegment = options?.segmentId && options.segmentId !== 'ALL'
+      ? this.segmentMap.get(options.segmentId.toUpperCase())
+      : undefined;
+
+    const weather = options?.weather || 'dry';
+    const weatherMult = weather === 'dry' ? 1.0 : weather === 'light_rain' ? 1.20 : 1.45;
+    const situation = options?.situation || 'baseline';
+    const regime = options?.regime || this.currentRegime;
+
+    // Road specific attributes or network baseline
+    const freeFlowSpeed = targetSegment ? targetSegment.free_flow_speed_kmh : 55.0;
+    const roadClass = targetSegment ? targetSegment.road_class : 'Network Aggregate';
+    const isExpressway = roadClass.toLowerCase().includes('expressway') || freeFlowSpeed >= 70;
+    const isBottleneck = targetSegment ? (targetSegment.ai_risk_level === 'CRITICAL' || targetSegment.is_anomaly) : false;
+
+    // Base congestion modifier from target segment live telemetry
+    const segCongestionOffset = targetSegment
+      ? (targetSegment.congestion_index - 0.40) * 35
+      : 0;
+
+    // Build 7 dynamic days
+    const dayTemplates = [
+      { name: 'Monday', baseCong: 48, baseTrips: 428, peak: '08:00 - 10:30', sens: 1.25, isWeekend: false },
+      { name: 'Tuesday', baseCong: 44, baseTrips: 436, peak: '08:30 - 10:15', sens: 1.20, isWeekend: false },
+      { name: 'Wednesday', baseCong: 49, baseTrips: 448, peak: '08:30 - 10:30', sens: 1.28, isWeekend: false },
+      { name: 'Thursday', baseCong: 53, baseTrips: 465, peak: '08:30 - 11:00', sens: 1.32, isWeekend: false },
+      { name: 'Friday', baseCong: 66, baseTrips: 512, peak: '16:30 - 21:30', sens: 1.45, isWeekend: false },
+      { name: 'Saturday', baseCong: 46, baseTrips: 422, peak: '12:00 - 15:30 & 19:00 - 22:30', sens: 1.24, isWeekend: true },
+      { name: 'Sunday', baseCong: 38, baseTrips: 368, peak: '17:00 - 21:30', sens: 1.18, isWeekend: true },
     ];
+
+    const days: WeeklyMacroDay[] = dayTemplates.map((t) => {
+      let cong = t.baseCong;
+      let trips = t.baseTrips;
+
+      // Adjust for road segment characteristics
+      cong += segCongestionOffset;
+
+      // Situation adjustments
+      if (t.name === 'Saturday') {
+        if (situation === 'weekend_mall_rush') {
+          cong += 16;
+          trips += 65;
+        } else if (situation === 'stadium_event') {
+          cong += 22;
+          trips += 75;
+        }
+        if (!isExpressway) {
+          // Arterials experience higher Saturday retail congestion
+          cong += 6;
+        }
+      } else if (t.name === 'Sunday') {
+        if (situation === 'sunday_highway_inbound' || isExpressway) {
+          // Expressways and return corridors surge heavily on Sunday evening
+          cong += 18;
+          trips += 48;
+        }
+        if (situation === 'weekend_mall_rush') {
+          cong += 12;
+          trips += 40;
+        }
+      } else if (t.name === 'Friday') {
+        if (isExpressway) {
+          // Friday evening outbound surge on expressways
+          cong += 8;
+        }
+      }
+
+      if (situation === 'workzone' && targetSegment) {
+        cong += 25;
+      }
+      if (isBottleneck) {
+        cong += 12;
+      }
+
+      // Regime resonance
+      if (regime === 'PEAK_AM' && (t.name === 'Monday' || t.name === 'Tuesday')) {
+        cong += 6;
+      } else if (regime === 'PEAK_PM' && (t.name === 'Thursday' || t.name === 'Friday')) {
+        cong += 8;
+      } else if (regime === 'LATE_NIGHT') {
+        cong = Math.max(12, cong - 15);
+      }
+
+      // Apply weather multiplier
+      const finalCong = Math.min(96, Math.max(10, Math.round(cong * weatherMult)));
+      // Speed inverse of congestion with road physical bounds
+      const speedRatio = Math.max(0.18, 1 - (finalCong / 115));
+      const finalSpeed = Math.round(freeFlowSpeed * speedRatio * 10) / 10;
+      const vcRatio = Math.round((finalCong / 75) * 100) / 100;
+
+      // Determine Level of Service (LOS)
+      let los = 'LOS B';
+      if (finalCong <= 25) los = 'LOS A';
+      else if (finalCong <= 40) los = 'LOS B';
+      else if (finalCong <= 55) los = 'LOS C';
+      else if (finalCong <= 70) los = 'LOS D';
+      else if (finalCong <= 85) los = 'LOS E';
+      else los = 'LOS F (Forced Breakdown)';
+
+      const bufferIndex = Math.round((finalCong * 0.72) * (t.isWeekend ? 0.85 : 1.1));
+      const delayMins = Math.round((freeFlowSpeed / Math.max(8, finalSpeed) - 1) * 22);
+
+      return {
+        day_name: t.name,
+        peak_hours: t.peak,
+        avg_congestion: finalCong,
+        avg_speed: finalSpeed,
+        total_trips_k: Math.round(trips * (weather === 'heavy_rain' ? 0.92 : 1.0)),
+        weather_sensitivity: t.sens,
+        los,
+        vc_ratio: vcRatio,
+        buffer_index_pct: bufferIndex,
+        delay_minutes: Math.max(2, delayMins),
+        is_weekend: t.isWeekend,
+      };
+    });
+
+    const sumSpeed = days.reduce((acc, d) => acc + d.avg_speed, 0);
+    const avgSpeed = Math.round((sumSpeed / days.length) * 10) / 10;
+    const lostHours = Math.round(days.reduce((acc, d) => acc + (d.delay_minutes || 10) * d.total_trips_k * 0.07, 0));
+    const fuelWasted = Math.round(lostHours * 1.55);
+    const carbonTons = Math.round(fuelWasted * 2.31 / 1000);
+
+    const busiest = [...days].sort((a, b) => b.avg_congestion - a.avg_congestion)[0]?.day_name || 'Friday';
 
     return {
       days,
-      weekly_avg_speed: 39.6,
-      total_vkt_millions: 14.2,
-      lost_hours_k: 246.0
+      weekly_avg_speed: avgSpeed,
+      total_vkt_millions: Math.round((targetSegment ? targetSegment.length_km * 480 : 14.2) * 10) / 10,
+      lost_hours_k: Math.round(lostHours / 10) / 100,
+      fuel_wasted_k_liters: Math.round(fuelWasted / 10) / 100,
+      carbon_tons: carbonTons,
+      busiest_day: busiest,
+      network_buffer_index: Math.round(days.reduce((acc, d) => acc + (d.buffer_index_pct || 30), 0) / days.length),
     };
+  }
+
+  public getRoadHourlyProfile(
+    dayName: string,
+    options?: {
+      segmentId?: string;
+      regime?: TrafficRegime;
+      weather?: 'dry' | 'light_rain' | 'heavy_rain';
+      situation?: string;
+    }
+  ): HourlyTrafficPoint[] {
+    const targetSegment = options?.segmentId && options.segmentId !== 'ALL'
+      ? this.segmentMap.get(options.segmentId.toUpperCase())
+      : undefined;
+
+    const weather = options?.weather || 'dry';
+    const weatherMult = weather === 'dry' ? 1.0 : weather === 'light_rain' ? 1.20 : 1.45;
+    const situation = options?.situation || 'baseline';
+    const regime = options?.regime || this.currentRegime;
+
+    const freeFlowSpeed = targetSegment ? targetSegment.free_flow_speed_kmh : 55.0;
+    const capacityVph = targetSegment ? targetSegment.capacity_vph : 4800;
+    const roadClass = targetSegment ? targetSegment.road_class : 'Arterial';
+    const isExpressway = roadClass.toLowerCase().includes('expressway') || freeFlowSpeed >= 70;
+    const isBottleneck = targetSegment ? (targetSegment.ai_risk_level === 'CRITICAL' || targetSegment.is_anomaly) : false;
+
+    // 24 Hour ticks
+    const hours = [
+      '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
+      '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
+      '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+      '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
+    ];
+
+    const isSaturday = dayName === 'Saturday';
+    const isSunday = dayName === 'Sunday';
+    const isFriday = dayName === 'Friday';
+
+    return hours.map((h, i) => {
+      let demandFactor = 0.15; // default off-peak baseline fraction of capacity
+
+      if (isSaturday) {
+        // Saturday realistic curve:
+        // 00:00 - 05:00: very low
+        // 06:00 - 09:00: mild morning exercise/markets (0.25 - 0.40)
+        // 11:00 - 15:30: Retail, mall, shopping and lunch rush (0.75 - 0.88)
+        // 16:00 - 17:30: mild dip (0.62)
+        // 18:30 - 22:30: Dinner, leisure, nightlife, cinema clusters (0.82 - 0.95)
+        // 23:00: tapering (0.45)
+        if (i <= 4) demandFactor = 0.18;
+        else if (i <= 8) demandFactor = 0.22 + (i - 4) * 0.06;
+        else if (i >= 9 && i <= 10) demandFactor = 0.58 + (i - 9) * 0.12;
+        else if (i >= 11 && i <= 15) demandFactor = 0.76 + (Math.sin((i - 11) / 4 * Math.PI) * 0.14);
+        else if (i >= 16 && i <= 17) demandFactor = 0.64;
+        else if (i >= 18 && i <= 21) demandFactor = 0.82 + (Math.sin((i - 18) / 3 * Math.PI) * 0.13);
+        else if (i === 22) demandFactor = 0.65;
+        else demandFactor = 0.38;
+
+        if (situation === 'weekend_mall_rush') demandFactor *= 1.25;
+        if (situation === 'stadium_event' && i >= 18 && i <= 22) demandFactor *= 1.40;
+      } else if (isSunday) {
+        // Sunday realistic curve:
+        // 00:00 - 06:00: quietest of the week (0.12)
+        // 07:00 - 11:00: light church/park/recreation (0.24 - 0.38)
+        // 12:00 - 15:00: family brunch/parks (0.50 - 0.62)
+        // 17:00 - 21:30: MASSIVE INTERCITY RETURN SURGE! Highway & gateway arterials jam! (0.85 - 1.05)
+        // 22:00 - 23:00: early bedtime wind down (0.28)
+        if (i <= 6) demandFactor = 0.12;
+        else if (i <= 10) demandFactor = 0.20 + (i - 6) * 0.05;
+        else if (i >= 11 && i <= 14) demandFactor = 0.48 + (Math.sin((i - 11) / 3 * Math.PI) * 0.12);
+        else if (i >= 15 && i <= 16) demandFactor = 0.62;
+        else if (i >= 17 && i <= 21) {
+          // Inbound return rush
+          const surgeBase = isExpressway ? 0.94 : 0.82;
+          demandFactor = surgeBase + (Math.sin((i - 17) / 4 * Math.PI) * 0.18);
+        } else demandFactor = 0.28;
+
+        if (situation === 'sunday_highway_inbound') {
+          if (i >= 16 && i <= 22) demandFactor *= 1.35;
+        }
+        if (situation === 'weekend_mall_rush' && i >= 11 && i <= 17) demandFactor *= 1.22;
+      } else {
+        // Weekdays:
+        // 00:00 - 05:00: late night / freight (0.15 - 0.22)
+        // 07:00 - 10:00: AM Peak (0.80 - 0.96)
+        // 11:00 - 15:00: Midday commercial & freight (0.52 - 0.62)
+        // 16:30 - 20:30: PM Peak (0.85 - 1.05 on Friday!)
+        // 21:00 - 23:00: Evening decline (0.35 - 0.25)
+        if (i <= 5) demandFactor = 0.14 + i * 0.02;
+        else if (i === 6) demandFactor = 0.45;
+        else if (i >= 7 && i <= 9) demandFactor = 0.84 + (i === 8 ? 0.14 : 0.04);
+        else if (i === 10) demandFactor = 0.68;
+        else if (i >= 11 && i <= 14) demandFactor = 0.54 + (i === 12 || i === 13 ? 0.08 : 0);
+        else if (i === 15) demandFactor = 0.62;
+        else if (i >= 16 && i <= 19) {
+          demandFactor = isFriday ? 0.96 + (i === 18 ? 0.15 : 0.06) : 0.86 + (i === 18 ? 0.10 : 0.02);
+        } else if (i === 20) demandFactor = isFriday ? 0.84 : 0.64;
+        else if (i === 21) demandFactor = isFriday ? 0.68 : 0.46;
+        else demandFactor = 0.26;
+      }
+
+      // Situational modifiers
+      if (situation === 'workzone' && targetSegment) {
+        demandFactor *= 1.30;
+      }
+      if (isBottleneck) {
+        demandFactor *= 1.22;
+      }
+
+      // Live regime pulse alignment
+      if (regime === 'PEAK_AM' && (i >= 7 && i <= 9) && targetSegment) {
+        demandFactor = Math.max(demandFactor, targetSegment.flow_vph / targetSegment.capacity_vph);
+      } else if (regime === 'PEAK_PM' && (i >= 17 && i <= 19) && targetSegment) {
+        demandFactor = Math.max(demandFactor, targetSegment.flow_vph / targetSegment.capacity_vph);
+      }
+
+      // Compute physical flow & volume
+      let flow = Math.round(capacityVph * demandFactor * weatherMult);
+      const effectiveCapacity = situation === 'workzone' ? Math.round(capacityVph * 0.55) : capacityVph;
+      const vcRatio = Math.round((flow / effectiveCapacity) * 100) / 100;
+
+      // Bureau of Public Roads (BPR) formulation: Speed = V0 / (1 + 0.15 * (V/C)^4)
+      const bprDenominator = 1 + 0.15 * Math.pow(Math.min(2.5, vcRatio), 4);
+      let calculatedSpeed = Math.round((freeFlowSpeed / bprDenominator) * 10) / 10;
+      calculatedSpeed = Math.max(8.0, calculatedSpeed);
+
+      // Congestion Index
+      let congestion = Math.round((1 - (calculatedSpeed / freeFlowSpeed)) * 100);
+      congestion = Math.min(98, Math.max(5, congestion));
+
+      // Level of Service
+      let los = 'LOS A';
+      if (vcRatio > 1.05 || calculatedSpeed < freeFlowSpeed * 0.3) los = 'LOS F';
+      else if (vcRatio > 0.85 || calculatedSpeed < freeFlowSpeed * 0.45) los = 'LOS E';
+      else if (vcRatio > 0.70 || calculatedSpeed < freeFlowSpeed * 0.60) los = 'LOS D';
+      else if (vcRatio > 0.50 || calculatedSpeed < freeFlowSpeed * 0.75) los = 'LOS C';
+      else if (vcRatio > 0.35) los = 'LOS B';
+
+      // Vehicle class split
+      const isWeekend = isSaturday || isSunday;
+      const freightPct = isWeekend ? 0.08 : 0.22;
+      const carsPct = isWeekend ? 0.74 : 0.62;
+      const twoWheelersPct = 1.0 - (freightPct + carsPct);
+
+      const delayMin = Math.round(Math.max(0, (freeFlowSpeed / calculatedSpeed - 1) * 14) * 10) / 10;
+      const fuelWasteLiters = Math.round(flow * (delayMin / 60) * 1.35 * 10) / 10;
+
+      return {
+        hour: h,
+        congestion,
+        avg_speed: calculatedSpeed,
+        flow_vph: flow,
+        capacity_vph: effectiveCapacity,
+        vc_ratio: vcRatio,
+        delay_min: delayMin,
+        los,
+        fuel_waste_liters: fuelWasteLiters,
+        passenger_cars_vph: Math.round(flow * carsPct),
+        freight_trucks_vph: Math.round(flow * freightPct),
+        two_wheelers_vph: Math.round(flow * twoWheelersPct),
+        is_peak: congestion >= 65 || vcRatio >= 0.88,
+      };
+    });
   }
 
   public getCityKPIs(): CityKPIs {
