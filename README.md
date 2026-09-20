@@ -6,7 +6,6 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/System-MargaNetra_v2.4-00E5FF?style=for-the-badge&logo=radar&logoColor=black" alt="MargaNetra">
-  <img src="https://img.shields.io/badge/Evaluation-100%2F100_Checkpoints-brightgreen?style=for-the-badge" alt="Evaluation 100/100">
   <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/React-19.0+-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React 19">
@@ -22,25 +21,24 @@
 
 1. [📌 Problem Understanding & Motivation](#-problem-understanding--motivation)
 2. [🏆 How MargaNetra Differs from Consumer Navigation (Google Maps)](#-how-marganetra-differs-from-consumer-navigation-google-maps)
-3. [📊 Evaluation Checkpoint Alignment (100 / 100 Marks)](#-evaluation-checkpoint-alignment-100--100-marks)
-4. [📈 Dataset Overview & Ingestion Specifications](#-dataset-overview--ingestion-specifications)
-5. [🧹 6-Type Realistic Sensor Noise Cleansing Pipeline](#-6-type-realistic-sensor-noise-cleansing-pipeline)
-6. [🏗️ End-to-End System Architecture & Dataflow](#-end-to-end-system-architecture--dataflow)
-7. [📂 Project Structure & Directory Organization](#-project-structure--directory-organization)
-8. [🎯 Detailed Module Breakdown](#-detailed-module-breakdown)
+3. [📈 Dataset Overview & Ingestion Specifications](#-dataset-overview--ingestion-specifications)
+4. [🧹 6-Type Realistic Sensor Noise Cleansing Pipeline](#-6-type-realistic-sensor-noise-cleansing-pipeline)
+5. [🏗️ End-to-End System Architecture & Dataflow](#-end-to-end-system-architecture--dataflow)
+6. [📂 Project Structure & Directory Organization](#-project-structure--directory-organization)
+7. [🎯 Detailed Module Breakdown](#-detailed-module-breakdown)
    - [Module 1: Ingestion & Network Graph Construction](#module-1-ingestion--network-graph-construction-srcingestion)
    - [Module 2: Real-Time Network State & Anomaly Engine](#module-2-real-time-network-state--anomaly-engine-srcstate_engine)
    - [Module 3: Multi-Horizon Forecasting Engine](#module-3-multi-horizon-forecasting-engine-srcforecasting)
    - [Module 4: Tactical Real-Time Advisory & Green Waves](#module-4-tactical-real-time-advisory--green-waves-srcadvisory)
    - [Module 5: Strategic Infrastructure Intervention Simulator](#module-5-strategic-infrastructure-intervention-simulator-srcinfrastructure)
    - [Module 6: Operator Web Command Center (React 19 + Three.js)](#module-6-operator-web-command-center-react-19--threejs)
-9. [📐 Mathematical Formulations & Traffic Physics](#-mathematical-formulations--traffic-physics)
-10. [🔬 Pre-Trained Model Benchmarks & Empirical Results](#-pre-trained-model-benchmarks--empirical-results)
-11. [🌍 Multi-Lingual LLM Dispatcher (EN / HI / TE)](#-multi-lingual-llm-dispatcher-en--hi--te)
-12. [📋 Implementable Advisory & Decision Catalog](#-implementable-advisory--decision-catalog)
-13. [🚀 Quick Start & Execution Guide (Python & TypeScript)](#-quick-start--execution-guide)
-14. [🔒 Compliance, Simulation, & Safety Notice](#-compliance-simulation--safety-notice)
-15. [👥 Authors, Team & Credits](#-authors-team--credits)
+8. [📐 Mathematical Formulations & Traffic Physics](#-mathematical-formulations--traffic-physics)
+9. [🔬 Pre-Trained Model Benchmarks & Empirical Results](#-pre-trained-model-benchmarks--empirical-results)
+10. [🌍 Multi-Lingual LLM Dispatcher (EN / HI / TE)](#-multi-lingual-llm-dispatcher-en--hi--te)
+11. [📋 Implementable Advisory & Decision Catalog](#-implementable-advisory--decision-catalog)
+12. [🚀 Quick Start & Execution Guide (Python & TypeScript)](#-quick-start--execution-guide)
+13. [🔒 Compliance, Simulation, & Safety Notice](#-compliance-simulation--safety-notice)
+14. [👥 Authors, Team & Credits](#-authors-team--credits)
 
 ---
 
@@ -93,19 +91,6 @@ Managing large, rapidly changing urban road networks in dense metropolises (such
 | **What-If Scenario Sandbox** | Not possible | **Interactive Console**: Drop accidents, close corridors, change signals, simulate rain |
 
 > 💡 **In One Line:** Google Maps helps one driver avoid traffic. MargaNetra helps the entire city **prevent** traffic.
-
----
-
-## 📊 Evaluation Checkpoint Alignment (100 / 100 Marks)
-
-MargaNetra satisfies and exceeds **100% of all evaluation checkpoints** established for Neurax Hackathon 3.0:
-
-| Checkpoint | Marks | Required Deliverables | Implementation Status | Verified Score |
-|:---:|:---:|---|---|:---:|
-| **CP1** | **15** | • Automated 6-type sensor noise cleansing pipeline<br>• NetworkX road network graph (436 segments, 120 nodes)<br>• 4-tier congestion classification engine<br>• Anomaly detection & multi-class incident classifier | ✅ `src/ingestion/cleaner.py`<br>✅ `src/ingestion/graph_builder.py`<br>✅ `src/state_engine/congestion_tracker.py`<br>✅ `src/state_engine/anomaly_detector.py` | **15 / 15** |
-| **CP2** | **25** | • Multi-horizon speed & flow forecasting (15, 30, 45, 60 min)<br>• LWR kinematic spillback propagation tracing<br>• Safeguarded diversion advisory generator<br>• Upstream traffic signal optimization | ✅ `src/forecasting/forecaster.py`<br>✅ `src/state_engine/spillback_tracer.py`<br>✅ `src/advisory/diversion_planner.py`<br>✅ `src/advisory/signal_optimizer.py` | **25 / 25** |
-| **CP3** | **60** | • Interactive operator dashboard (React 19 + Three.js)<br>• 3D WebGL Digital Twin & Tactical GIS Vector Canvas<br>• Interactive What-If Scenario Console<br>• 90 Planning candidate counterfactual ROI evaluation<br>• Multilingual situational briefings (EN / HI / TE)<br>• Complete automated verification test suite | ✅ `src/components/neurax/NeuraXDashboard.tsx`<br>✅ `src/components/neurax/Network3DDigitalTwin.tsx`<br>✅ `src/components/neurax/TacticalGISMap.tsx`<br>✅ `src/infrastructure/intervention_simulator.py`<br>✅ `src/services/geminiService.ts`<br>✅ `pytest tests/` & `evaluate_submission.py` | **60 / 60** |
-| **TOTAL** | **100** | **Comprehensive Full-Stack AI Traffic Decision Support System** | **Production-Ready & Fully Verified** | **100 / 100** |
 
 ---
 
